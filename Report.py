@@ -3,6 +3,7 @@ import os
 import requests
 import sys
 import subprocess
+import webbrowser
 from colorama import Fore, Style, init
 
 init(autoreset=True)
@@ -36,56 +37,90 @@ def open_browser(url):
     """
     Android (Termux), Windows, Linux (Kali), Mac — sab me browser kholta hai
     """
+    # 1️⃣ Termux (Android)
     try:
-        # Android Termux
         if "com.termux" in os.environ.get("PREFIX", ""):
+            # Pehle termux-open-url try karo
             if subprocess.run(["which", "termux-open-url"],
                               capture_output=True).returncode == 0:
                 subprocess.run(["termux-open-url", url], check=True)
                 return True
-            else:
-                # Fallback: am start use karo
+            # Fallback: am start
+            try:
                 subprocess.run(
                     ["am", "start", "-a", "android.intent.action.VIEW",
                      "-d", url],
-                    check=True
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
                 )
                 return True
+            except Exception:
+                pass
+    except Exception:
+        pass
 
-        # Windows
-        elif os.name == "nt":
+    # 2️⃣ Windows
+    if os.name == "nt":
+        try:
             os.startfile(url)
             return True
+        except Exception:
+            pass
 
-        # Linux (Kali, Ubuntu, etc.)
-        elif sys.platform.startswith("linux"):
-            if subprocess.run(["which", "xdg-open"],
-                              capture_output=True).returncode == 0:
+    # 3️⃣ Mac
+    if sys.platform == "darwin":
+        try:
+            subprocess.run(["open", url], check=True)
+            return True
+        except Exception:
+            pass
+
+    # 4️⃣ Linux (Kali, Ubuntu, etc.)
+    if sys.platform.startswith("linux"):
+        # xdg-open
+        if subprocess.run(["which", "xdg-open"],
+                          capture_output=True).returncode == 0:
+            try:
                 subprocess.run(["xdg-open", url],
                                check=True,
                                stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL)
                 return True
-            # Fallback browsers
-            for browser in ["firefox", "google-chrome", "chromium",
-                            "chromium-browser"]:
-                if subprocess.run(["which", browser],
-                                  capture_output=True).returncode == 0:
+            except Exception:
+                pass
+        # Direct browsers
+        for browser in ["firefox", "google-chrome", "chromium",
+                        "chromium-browser", "brave-browser", "microsoft-edge"]:
+            if subprocess.run(["which", browser],
+                              capture_output=True).returncode == 0:
+                try:
                     subprocess.Popen([browser, url],
                                      stdout=subprocess.DEVNULL,
                                      stderr=subprocess.DEVNULL)
                     return True
-            return False
+                except Exception:
+                    pass
 
-        # Mac
-        elif sys.platform == "darwin":
-            subprocess.run(["open", url], check=True)
+    # 5️⃣ Universal fallback — Python ka webbrowser module
+    try:
+        opened = webbrowser.open(url, new=2)  # new=2 → new tab
+        if opened:
             return True
+    except Exception:
+        pass
 
-    except Exception as e:
-        print(Fore.RED + f"\n⚠️ Browser open nahi ho paya: {e}")
-        print(Fore.YELLOW + f"👉 Manually ye link kholo:\n{Fore.CYAN}{url}")
-        return False
+    # 6️⃣ Last fallback: Termux me am start dobara try
+    try:
+        subprocess.run(
+            ["am", "start", "-a", "android.intent.action.VIEW", "-d", url],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return True
+    except Exception:
+        pass
 
     return False
 
